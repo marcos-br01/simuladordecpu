@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de CPU - Material 09</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f1f5f9; --cpu-bg: #1e293b; --cpu-text: #f8fafc;
+    --mem-bg: #ffffff; --mem-text: #334155;
+    --primary: #3b82f6; --highlight: #f59e0b;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--mem-text); display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+  h2 { color: #0f172a; margin-bottom: 20px; text-align: center; }
+  
+  .container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 1000px; width: 100%; }
+  
+  .panel { border-radius: 12px; padding: 20px; width: 340px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+  .cpu-panel { background: var(--cpu-bg); color: var(--cpu-text); }
+  .mem-panel { background: var(--mem-bg); border: 1px solid #e2e8f0; }
+  
+  h3 { margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+  .mem-panel h3 { border-bottom-color: #e2e8f0; color: #0f172a; }
+  
+  .status-badge { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; font-weight: 600; text-align: center; color: #38bdf8; margin-bottom: 15px; font-size: 0.95rem; }
+  
+  .component-group { margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+  .component-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 8px; font-weight: 700; }
+  
+  .register, .memory-slot {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px;
+    font-family: 'Fira Code', monospace; font-size: 0.9rem; margin-bottom: 5px;
+    transition: all 0.3s;
+  }
+  .mem-panel .memory-slot { background: #f8fafc; border: 1px solid #e2e8f0; }
+  .register-label { font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 600; }
+  
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  }
+  
+  .highlight {
+    background-color: rgba(245, 158, 11, 0.25) !important;
+    border-color: var(--highlight) !important;
+    color: var(--highlight);
+    animation: pulse 1s infinite;
+    transform: scale(1.02);
+  }
+  .cpu-panel .highlight { color: #fcd34d; background-color: rgba(245, 158, 11, 0.4) !important; }
+  
+  button { margin-top: 30px; padding: 15px 30px; font-size: 1rem; font-weight: 600; cursor: pointer; background: var(--primary); color: white; border: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); transition: 0.2s; }
+  button:hover { background: #2563eb; transform: translateY(-2px); }
+</style>
+</head>
+<body>
+
+  <h2>Simulador de CPU - Arquitetura e Organização</h2>
+  
+  <div class="container">
+    <div class="panel cpu-panel" id="cpu">
+      <h3>⚡ CPU <span id="ciclo-contador" style="font-size: 0.8rem; color: #94a3b8;">Ciclo: 0</span></h3>
+      <div class="status-badge" id="fase">Aguardando Início...</div>
+      
+      <div class="component-group" id="uc-group">
+        <div class="component-title">Unidade de Controle (UC)</div>
+        <div class="register" id="reg-ci"><span class="register-label">CI (Contador Inst.)</span><span id="ci">0</span></div>
+        <div class="register" id="reg-ri"><span class="register-label">RI (Reg. Instrução)</span><span id="ri">---</span></div>
+      </div>
+
+      <div class="component-group" id="bus-group">
+        <div class="component-title">Interface de Memória</div>
+        <div class="register" id="reg-rem"><span class="register-label">REM (Reg. Endereço)</span><span id="rem">---</span></div>
+        <div class="register" id="reg-rdm"><span class="register-label">RDM (Reg. Dados)</span><span id="rdm">---</span></div>
+      </div>
+
+      <div class="component-group" id="ula-group">
+        <div class="component-title">Unidade Lógica e Aritmética (ULA)</div>
+        <div class="register" id="reg-acc"><span class="register-label">ACC (Acumulador)</span><span id="acc">0</span></div>
+      </div>
+    </div>
+
+    <div class="panel mem-panel" id="memoria">
+      <h3>💾 Memória Principal</h3>
+      
+      <div class="component-title" style="color: #64748b; margin-top: 10px;">Área de Instruções</div>
+      <div class="memory-slot" id="mem-0"><span>00:</span> <span>LOAD 10</span></div>
+      <div class="memory-slot" id="mem-1"><span>01:</span> <span>ADD 11</span></div>
+      <div class="memory-slot" id="mem-2"><span>02:</span> <span>STORE 12</span></div>
+      <div class="memory-slot" id="mem-3"><span>03:</span> <span>HALT</span></div>
+      
+      <div class="component-title" style="color: #64748b; margin-top: 20px;">Área de Dados</div>
+      <div class="memory-slot" id="dado-10"><span>End 10:</span> <span>5</span></div>
+      <div class="memory-slot" id="dado-11"><span>End 11:</span> <span>3</span></div>
+      <div class="memory-slot" id="dado-12"><span>End 12:</span> <span id="val-12">0</span></div>
+    </div>
+  </div>
+
+  <button onclick="proximoPasso()">Avançar Micro-operação ➔</button>
+
+  <script>
+    let ci = 0, acc = 0, ri = "", rem = "", rdm = "", estado = 0, ciclos = 1;
+    const memoria = ["LOAD 10", "ADD 11", "STORE 12", "HALT"];
+    const dados = {10: 5, 11: 3, 12: 0};
+
+    function limparDestaques() { document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight')); }
+    function atualizarUI(id, valor) { document.getElementById(id).innerText = valor; }
+    function destacar(id) { document.getElementById(id).classList.add('highlight'); }
+
+    function proximoPasso() {
+      limparDestaques();
+      if (ci >= memoria.length || ri === "HALT") return alert("Execução finalizada!");
+
+      const faseEl = document.getElementById('fase');
+      document.getElementById('ciclo-contador').innerText = `Ciclo: ${ciclos}`;
+
+      switch(estado) {
+        case 0: // 1. Busca a Instrução
+          faseEl.innerText = "1. Busca a Instrução (CI->REM->RDM->RI)";
+          rem = ci; atualizarUI('rem', rem); destacar('reg-rem');
+          rdm = memoria[rem]; atualizarUI('rdm', rdm); destacar('reg-rdm');
+          destacar('mem-' + rem);
+          ri = rdm; atualizarUI('ri', ri); destacar('reg-ri');
+          estado = 1;
+          break;
+
+        case 1: // 2. Incrementa CI
+          faseEl.innerText = "2. Incrementa CI (CI = CI + 1)";
+          ci++;
+          atualizarUI('ci', ci); destacar('reg-ci');
+          estado = 2;
+          break;
+
+        case 2: // 3. Decodifica a Instrução
+          faseEl.innerText = "3. Decodifica (UC analisa RI)";
+          destacar('uc-group'); destacar('reg-ri');
+          estado = 3;
+          break;
+
+        case 3: // 4. Busca Operandos
+          let partesBusca = ri.split(" ");
+          if (partesBusca.length > 1 && partesBusca[0] !== "STORE") {
+            faseEl.innerText = "4. Busca Operandos (REM <- Endereço, RDM <- Dado)";
+            rem = parseInt(partesBusca[1]); atualizarUI('rem', rem); destacar('reg-rem');
+            rdm = dados[rem]; atualizarUI('rdm', rdm); destacar('reg-rdm');
+            destacar('dado-' + rem);
+          } else {
+            faseEl.innerText = "4. Busca Operandos (Não necessário / STORE)";
+          }
+          estado = 4;
+          break;
+
+        case 4: // 5. Executa
+          faseEl.innerText = "5. Executa (ULA opera)";
+          let partesEx = ri.split(" ");
+          let inst = partesEx[0]; let end = parseInt(partesEx[1]);
+          
+          if (inst === "LOAD") { acc = rdm; }
+          else if (inst === "ADD") { acc += rdm; }
+          else if (inst === "STORE") {
+            dados[end] = acc;
+            rdm = acc; atualizarUI('rdm', rdm);
+            rem = end; atualizarUI('rem', rem);
+            atualizarUI('val-' + end, acc);
+            destacar('dado-' + end); destacar('reg-rdm'); destacar('reg-rem');
+          }
+          
+          atualizarUI('acc', acc); destacar('reg-acc'); destacar('ula-group');
+          estado = 0;
+          ciclos++;
+          break;
+      }
+    }
+  </script>
+</body>
+</html>
