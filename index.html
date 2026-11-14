@@ -32,11 +32,23 @@ tr.hl td{background:var(--hlbg)}
 button{padding:12px 20px;font-size:1rem;font-weight:600;cursor:pointer;background:var(--pri);color:#fff;border:0;border-radius:8px}
 button.s{background:var(--mut)}
 button:focus-visible{outline:3px solid var(--hl);outline-offset:2px}
+.ph{display:flex;gap:6px;max-width:1100px;margin:0 auto 12px}
+.ph div{flex:1;text-align:center;padding:6px;border:2px solid var(--bd);border-radius:8px;opacity:.5;font-weight:600;background:var(--card)}
+.ph div.on{opacity:1;border-color:var(--pri);background:var(--hlbg)}
+.ch{border-color:#16a34a!important;animation:fl 1s}
+@keyframes fl{from{background:#86efac}}
+@media (prefers-reduced-motion:reduce){.ch{animation:none}}
+#log{max-height:260px;overflow:auto;font:.8rem ui-monospace,Menlo,Consolas,monospace;margin:0;padding-left:18px}
+#log li{margin:3px 0}
+select,input[type=range]{font-size:1rem;padding:6px}
+details{max-width:1100px;margin:0 auto 12px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 12px}
 </style>
 </head>
 <body>
 <h1>Simulador do Ciclo de Instrução</h1>
 <div id="banner">Clique em Avançar para iniciar o primeiro ciclo.</div>
+<div class="ph"><div id="p-fetch">1. Busca (Fetch)</div><div id="p-decode">2. Decodificação (Decode)</div><div id="p-exec">3. Execução (Execute)</div></div>
+<details open><summary>Como usar</summary><p>Escolha um programa e clique em Avançar para ver cada micro-passo. Amarelo indica o componente em uso e verde indica o valor que acabou de mudar. O registro de alterações no fim da página mostra o que mudou em cada passo, e Voltar desfaz o último passo. A busca do operando faz parte da fase de decodificação.</p><label>Programa: <select id="prog" onchange="reiniciar()"><option value="0">LDA, ADD, SUB e STR</option><option value="1">Soma de dois valores</option></select></label></details>
 
 <div class="wrap">
   <div class="card">
@@ -72,22 +84,27 @@ button:focus-visible{outline:3px solid var(--hl);outline-offset:2px}
   </div>
 </div>
 
+<div class="wrap"><div class="card" style="max-width:1100px;flex-basis:100%"><h3>Registro de alterações (passo mais recente no topo)</h3><ul id="log"></ul></div></div>
 <div class="btns">
+  <button class="s" onclick="voltar()">⬅ Voltar</button>
   <button onclick="avancar()">Avançar micro-passo ➔</button>
+  <button class="s" onclick="rodarCiclo()">Executar ciclo</button>
   <button class="s" id="auto" onclick="auto()">Automático</button>
   <button class="s" onclick="reiniciar()">Reiniciar</button>
+  <label>Intervalo (ms) <input type="range" id="vel" min="300" max="2000" step="100" value="1000" oninput="if(timer){auto();auto()}"></label>
 </div>
 
 <script>
 const OPS=["ADD","SUB","LDA","STR"],DESC=["ACC ← ACC + OPE","ACC ← ACC − OPE","ACC ← OPE","OPE ← ACC"];
-const INIT=[0b10000110,0b00000111,0b01001000,0b11001001,0,0,5,3,1,0]; // LDA 6, ADD 7, SUB 8, STR 9
-const FL=["busca","inc","dec","tem","op","exe","fim"],NINST=4;
+const PROGS=[{m:[0b10000110,0b00000111,0b01001000,0b11001001,0,0,5,3,1,0],n:4,r:9},{m:[0b10000100,0b00000101,0b11000110,0,10,20,0,0,0,0],n:3,r:6}]; // 0: LDA 6, ADD 7, SUB 8, STR 9 | 1: LDA 4, ADD 5, STR 6
+let INIT=PROGS[0].m,NINST=4;
+const FL=["busca","inc","dec","tem","op","exe","fim"];
 const $=i=>document.getElementById(i),b=(n,l=8)=>n.toString(2).padStart(l,"0");
-let mem,ci,ri,rem,rdm,acc,dec,ula,curOp,cycle,n,gen,reached,done,timer,bus;
+let mem,ci,ri,rem,rdm,acc,dec,ula,curOp,cycle,n,gen,reached,done,timer,bus,log,sc,prev,chg,ultimo;
 
 function reiniciar(){
   clearInterval(timer);timer=null;$("auto").textContent="Automático";
-  mem=[...INIT];ci=0;ri=0;rem=0;rdm=0;acc=0;dec="—";ula="—";curOp=-1;cycle=1;n=0;done=false;bus=null;
+  const pg=PROGS[$("prog").value];INIT=pg.m;NINST=pg.n;mem=[...INIT];log=[];sc=0;chg=[];ultimo="";ci=0;ri=0;rem=0;rdm=0;acc=0;dec="—";ula="—";curOp=-1;cycle=1;n=0;done=false;bus=null;
   gen=ciclo();reached=new Set();
   $("banner").textContent="Clique em Avançar para iniciar o primeiro ciclo.";$("banner").style.background="#475569";
   draw([],null);
@@ -131,30 +148,42 @@ function avancar(){
   let r=gen.next();
   if(r.done){
     if(ci>=NINST){done=true;clearInterval(timer);timer=null;$("auto").textContent="Automático";
-      $("banner").textContent="Programa concluído: ACC = "+acc+" e a posição 9 da memória guarda "+mem[9]+".";return}
-    cycle++;dec="—";ula="—";curOp=-1;reached=new Set();gen=ciclo();r=gen.next();
+      $("banner").textContent="Programa concluído: ACC = "+acc+" e a posição "+PROGS[$("prog").value].r+" da memória guarda "+mem[PROGS[$("prog").value].r]+".";return}
+    cycle++;sc=0;dec="—";ula="—";curOp=-1;reached=new Set();gen=ciclo();r=gen.next();
   }
-  const p=r.value;n++;
-  if(p.run)p.run();
-  reached.add(p.fl);bus=p.bus;
+  const p=r.value;n++;sc++;prev=snap();
+  if(p.run)p.run();registrar(p);
+  reached.add(p.fl);bus=p.bus;ultimo=p.fl;
   draw(p.ids,p);
 }
 function draw(ids,p){
-  document.querySelectorAll(".hl").forEach(e=>e.classList.remove("hl"));
+  document.querySelectorAll(".hl,.ch").forEach(e=>e.classList.remove("hl","ch"));
   $("ci").textContent=b(ci,6);$("ri").textContent=b(ri>>6,2)+" "+b(ri&63,6);
   $("rem").textContent=b(rem,6);$("rdm").textContent=b(rdm);$("acc").textContent=b(acc);
   $("dect").textContent=dec;$("ulat").textContent=ula;$("cic").textContent="Ciclo "+cycle;
   $("bAv").textContent=bus&&bus[0]=="A"?bus[1]:"—";$("bDv").textContent=bus&&bus[0]=="D"?bus[1]:"—";
-  $("mem").innerHTML=mem.map((v,i)=>`<div class="x" id="m${i}"><b>${i}</b><span>${i<4?b(v>>6,2)+" "+b(v&63,6)+" "+OPS[v>>6]+" "+(v&63):b(v)}</span></div>`).join("");
+  $("mem").innerHTML=mem.map((v,i)=>`<div class="x" id="m${i}"><b>${i}</b><span>${i<NINST?b(v>>6,2)+" "+b(v&63,6)+" "+OPS[v>>6]+" "+(v&63):b(v)}</span></div>`).join("");
   $("tb").innerHTML=OPS.map((o,i)=>`<tr id="t${i}"${i==curOp?' class="hl"':""}><td>${b(i,2)}</td><td>${o}</td><td>${DESC[i]}</td></tr>`).join("");
-  ids.forEach(i=>$(i).classList.add("hl"));
+  ids.forEach(i=>$(i).classList.add("hl"));chg.forEach(i=>$(i).classList.add("ch"));
   if(bus){$(bus[0]=="A"?"bA":"bD").classList.add("hl")}
   FL.forEach(f=>{const e=$("f-"+f);e.classList.toggle("on",reached.has(f));e.classList.toggle("cur",!!p&&f==p.fl)});
-  if(p){$("banner").textContent=p.txt;$("banner").style.background="hsl("+(n*53%360)+" 60% 34%)"}
+  const PH={busca:"fetch",inc:"fetch",dec:"decode",tem:"decode",op:"decode",exe:"exec"};["fetch","decode","exec"].forEach(f=>$("p-"+f).classList.toggle("on",!!p&&PH[p.fl]==f));$("log").innerHTML=log.join("");
+  if(p){$("banner").textContent="Passo "+sc+": "+p.txt;$("banner").style.background="hsl("+(n*53%360)+" 60% 34%)"}
 }
+function snap(){return{ci,ri,rem,rdm,acc,dec,ula,mem:[...mem]}}
+function fmt(k,v){return typeof v=="string"?v:k=="ri"?b(v>>6,2)+" "+b(v&63,6):b(v,k=="ci"||k=="rem"?6:8)}
+function registrar(p){
+  const c=snap(),t=[];chg=[];
+  for(const k of ["ci","ri","rem","rdm","acc","dec","ula"])if(prev[k]!==c[k]){t.push(k.toUpperCase()+": "+fmt(k,prev[k])+" → "+fmt(k,c[k]));chg.push(k=="dec"||k=="ula"?k:"r-"+k)}
+  c.mem.forEach((v,i)=>{if(v!==prev.mem[i]){t.push("MEM["+i+"]: "+b(prev.mem[i])+" → "+b(v));chg.push("m"+i)}});
+  log.unshift("<li><b>Ciclo "+cycle+", passo "+sc+":</b> "+p.txt+(t.length?" — "+t.join("; "):"")+"</li>");
+  if(log.length>80)log.pop();
+}
+function voltar(){if(n<1)return;const k=n-1;reiniciar();for(let i=0;i<k;i++)avancar()}
+function rodarCiclo(){let g=0;do{avancar();g++}while(!done&&ultimo!="fim"&&g<60)}
 function auto(){
   if(timer){clearInterval(timer);timer=null;$("auto").textContent="Automático";return}
-  if(done)return;$("auto").textContent="Pausar";timer=setInterval(avancar,1000);
+  if(done)return;$("auto").textContent="Pausar";timer=setInterval(avancar,+$("vel").value);
 }
 reiniciar();
 </script>
