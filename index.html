@@ -2,178 +2,161 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simulador de CPU - Material 09</title>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador do Ciclo de Instrução</title>
 <style>
-  :root {
-    --bg: #f1f5f9; --cpu-bg: #1e293b; --cpu-text: #f8fafc;
-    --mem-bg: #ffffff; --mem-text: #334155;
-    --primary: #3b82f6; --highlight: #f59e0b;
-  }
-  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--mem-text); display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
-  h2 { color: #0f172a; margin-bottom: 20px; text-align: center; }
-  
-  .container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 1000px; width: 100%; }
-  
-  .panel { border-radius: 12px; padding: 20px; width: 340px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-  .cpu-panel { background: var(--cpu-bg); color: var(--cpu-text); }
-  .mem-panel { background: var(--mem-bg); border: 1px solid #e2e8f0; }
-  
-  h3 { margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
-  .mem-panel h3 { border-bottom-color: #e2e8f0; color: #0f172a; }
-  
-  .status-badge { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; font-weight: 600; text-align: center; color: #38bdf8; margin-bottom: 15px; font-size: 0.95rem; }
-  
-  .component-group { margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
-  .component-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 8px; font-weight: 700; }
-  
-  .register, .memory-slot {
-    display: flex; justify-content: space-between; align-items: center;
-    background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px;
-    font-family: 'Fira Code', monospace; font-size: 0.9rem; margin-bottom: 5px;
-    transition: all 0.3s;
-  }
-  .mem-panel .memory-slot { background: #f8fafc; border: 1px solid #e2e8f0; }
-  .register-label { font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 600; }
-  
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
-    70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-  }
-  
-  .highlight {
-    background-color: rgba(245, 158, 11, 0.25) !important;
-    border-color: var(--highlight) !important;
-    color: var(--highlight);
-    animation: pulse 1s infinite;
-    transform: scale(1.02);
-  }
-  .cpu-panel .highlight { color: #fcd34d; background-color: rgba(245, 158, 11, 0.4) !important; }
-  
-  button { margin-top: 30px; padding: 15px 30px; font-size: 1rem; font-weight: 600; cursor: pointer; background: var(--primary); color: white; border: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); transition: 0.2s; }
-  button:hover { background: #2563eb; transform: translateY(-2px); }
+:root{--bg:#f1f5f9;--card:#fff;--tx:#1e293b;--mut:#64748b;--bd:#cbd5e1;--hl:#f59e0b;--hlbg:#fef3c7;--pri:#2563eb;--cpu:#ecfdf5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--card:#1e293b;--tx:#e2e8f0;--mut:#94a3b8;--bd:#334155;--hlbg:#5b3a05;--pri:#60a5fa;--cpu:#12301f}}
+:root[data-theme="dark"]{--bg:#0f172a;--card:#1e293b;--tx:#e2e8f0;--mut:#94a3b8;--bd:#334155;--hlbg:#5b3a05;--pri:#60a5fa;--cpu:#12301f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding:12px;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1{font-size:1.2rem;text-align:center;margin:4px 0 10px}
+#banner{border-radius:8px;color:#fff;padding:10px 14px;font-weight:600;margin:0 auto 12px;max-width:1100px;background:#475569;transition:background .3s}
+.wrap{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:1100px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;flex:1 1 250px;max-width:380px;min-width:0}
+.cpu{background:var(--cpu);flex-basis:330px}
+h3{margin:0 0 8px;font-size:.85rem;color:var(--mut)}
+.x{display:flex;justify-content:space-between;gap:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;border:1px solid var(--bd);border-radius:6px;padding:4px 8px;margin:4px 0;background:var(--card);transition:all .25s}
+.x b{font-family:system-ui,sans-serif;font-weight:600}
+.hl{background:var(--hlbg)!important;border-color:var(--hl)!important;box-shadow:0 0 0 2px var(--hl)}
+.n{border:2px solid var(--pri);border-radius:8px;padding:6px;text-align:center;margin:6px auto;opacity:.3;transition:all .3s;background:var(--card)}
+.n.on{opacity:1}.n.cur{background:var(--hlbg);border-color:var(--hl)}
+.n.q{border-radius:999px}
+.row{display:flex;gap:8px;align-items:center}.row .n{flex:1}
+.lbl{font-size:.75rem;color:var(--mut);text-align:center}
+.bus b{min-width:0}
+table{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:8px}
+td,th{border:1px solid var(--bd);padding:3px 6px;text-align:left}
+tr.hl td{background:var(--hlbg)}
+.btns{display:flex;gap:8px;justify-content:center;margin:14px 0 4px;flex-wrap:wrap}
+button{padding:12px 20px;font-size:1rem;font-weight:600;cursor:pointer;background:var(--pri);color:#fff;border:0;border-radius:8px}
+button.s{background:var(--mut)}
+button:focus-visible{outline:3px solid var(--hl);outline-offset:2px}
 </style>
 </head>
 <body>
+<h1>Simulador do Ciclo de Instrução</h1>
+<div id="banner">Clique em Avançar para iniciar o primeiro ciclo.</div>
 
-  <h2>Simulador de CPU - Arquitetura e Organização</h2>
-  
-  <div class="container">
-    <div class="panel cpu-panel" id="cpu">
-      <h3>⚡ CPU <span id="ciclo-contador" style="font-size: 0.8rem; color: #94a3b8;">Ciclo: 0</span></h3>
-      <div class="status-badge" id="fase">Aguardando Início...</div>
-      
-      <div class="component-group" id="uc-group">
-        <div class="component-title">Unidade de Controle (UC)</div>
-        <div class="register" id="reg-ci"><span class="register-label">CI (Contador Inst.)</span><span id="ci">0</span></div>
-        <div class="register" id="reg-ri"><span class="register-label">RI (Reg. Instrução)</span><span id="ri">---</span></div>
-      </div>
-
-      <div class="component-group" id="bus-group">
-        <div class="component-title">Interface de Memória</div>
-        <div class="register" id="reg-rem"><span class="register-label">REM (Reg. Endereço)</span><span id="rem">---</span></div>
-        <div class="register" id="reg-rdm"><span class="register-label">RDM (Reg. Dados)</span><span id="rdm">---</span></div>
-      </div>
-
-      <div class="component-group" id="ula-group">
-        <div class="component-title">Unidade Lógica e Aritmética (ULA)</div>
-        <div class="register" id="reg-acc"><span class="register-label">ACC (Acumulador)</span><span id="acc">0</span></div>
-      </div>
-    </div>
-
-    <div class="panel mem-panel" id="memoria">
-      <h3>💾 Memória Principal</h3>
-      
-      <div class="component-title" style="color: #64748b; margin-top: 10px;">Área de Instruções</div>
-      <div class="memory-slot" id="mem-0"><span>00:</span> <span>LOAD 10</span></div>
-      <div class="memory-slot" id="mem-1"><span>01:</span> <span>ADD 11</span></div>
-      <div class="memory-slot" id="mem-2"><span>02:</span> <span>STORE 12</span></div>
-      <div class="memory-slot" id="mem-3"><span>03:</span> <span>HALT</span></div>
-      
-      <div class="component-title" style="color: #64748b; margin-top: 20px;">Área de Dados</div>
-      <div class="memory-slot" id="dado-10"><span>End 10:</span> <span>5</span></div>
-      <div class="memory-slot" id="dado-11"><span>End 11:</span> <span>3</span></div>
-      <div class="memory-slot" id="dado-12"><span>End 12:</span> <span id="val-12">0</span></div>
-    </div>
+<div class="wrap">
+  <div class="card">
+    <h3>Fluxograma <span id="cic" style="float:right">Ciclo 1</span></h3>
+    <div class="n on" id="f-ini">Início</div>
+    <div class="n" id="f-busca">Busca a Instrução</div>
+    <div class="n" id="f-inc">Incrementa CI</div>
+    <div class="n" id="f-dec">Decodifica a Instrução</div>
+    <div class="row"><div class="n q" id="f-tem">Tem operando?</div><span class="lbl">Sim →</span><div class="n" id="f-op">Busca Operando</div></div>
+    <div class="lbl">↓ Não (volta aqui se houver mais operandos)</div>
+    <div class="n" id="f-exe">Executa a Instrução</div>
+    <div class="n" id="f-fim">Fim do ciclo</div>
   </div>
 
-  <button onclick="proximoPasso()">Avançar Micro-operação ➔</button>
+  <div class="card cpu">
+    <h3>CPU</h3>
+    <div class="x" id="r-ci"><b>CI (Contador de Instrução)</b><span id="ci"></span></div>
+    <div class="x" id="r-ri"><b>RI (Reg. de Instrução)</b><span id="ri"></span></div>
+    <div class="x" id="r-rem"><b>REM (Reg. de Endereço)</b><span id="rem"></span></div>
+    <div class="x" id="r-rdm"><b>RDM (Reg. de Dados)</b><span id="rdm"></span></div>
+    <div class="x" id="r-acc"><b>ACC (Acumulador)</b><span id="acc"></span></div>
+    <div class="x" id="dec"><b>DEC (Decodificador)</b><span id="dect"></span></div>
+    <div class="x" id="ula"><b>ULA</b><span id="ulat"></span></div>
+    <div class="x" id="uc"><b>UC (Unidade de Controle)</b><span>comanda o ciclo</span></div>
+    <div class="x bus" id="bA"><b>Barramento de endereços</b><span id="bAv">—</span></div>
+    <div class="x bus" id="bD"><b>Barramento de dados</b><span id="bDv">—</span></div>
+  </div>
 
-  <script>
-    let ci = 0, acc = 0, ri = "", rem = "", rdm = "", estado = 0, ciclos = 1;
-    const memoria = ["LOAD 10", "ADD 11", "STORE 12", "HALT"];
-    const dados = {10: 5, 11: 3, 12: 0};
+  <div class="card">
+    <h3>Memória principal (instruções e dados juntos)</h3>
+    <div id="mem"></div>
+    <table><tr><th>UPCOD</th><th>Op.</th><th>Descrição</th></tr><tbody id="tb"></tbody></table>
+  </div>
+</div>
 
-    function limparDestaques() { document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight')); }
-    function atualizarUI(id, valor) { document.getElementById(id).innerText = valor; }
-    function destacar(id) { document.getElementById(id).classList.add('highlight'); }
+<div class="btns">
+  <button onclick="avancar()">Avançar micro-passo ➔</button>
+  <button class="s" id="auto" onclick="auto()">Automático</button>
+  <button class="s" onclick="reiniciar()">Reiniciar</button>
+</div>
 
-    function proximoPasso() {
-      limparDestaques();
-      if (ci >= memoria.length || ri === "HALT") return alert("Execução finalizada!");
+<script>
+const OPS=["ADD","SUB","LDA","STR"],DESC=["ACC ← ACC + OPE","ACC ← ACC − OPE","ACC ← OPE","OPE ← ACC"];
+const INIT=[0b10000110,0b00000111,0b01001000,0b11001001,0,0,5,3,1,0]; // LDA 6, ADD 7, SUB 8, STR 9
+const FL=["busca","inc","dec","tem","op","exe","fim"],NINST=4;
+const $=i=>document.getElementById(i),b=(n,l=8)=>n.toString(2).padStart(l,"0");
+let mem,ci,ri,rem,rdm,acc,dec,ula,curOp,cycle,n,gen,reached,done,timer,bus;
 
-      const faseEl = document.getElementById('fase');
-      document.getElementById('ciclo-contador').innerText = `Ciclo: ${ciclos}`;
-
-      switch(estado) {
-        case 0: // 1. Busca a Instrução
-          faseEl.innerText = "1. Busca a Instrução (CI->REM->RDM->RI)";
-          rem = ci; atualizarUI('rem', rem); destacar('reg-rem');
-          rdm = memoria[rem]; atualizarUI('rdm', rdm); destacar('reg-rdm');
-          destacar('mem-' + rem);
-          ri = rdm; atualizarUI('ri', ri); destacar('reg-ri');
-          estado = 1;
-          break;
-
-        case 1: // 2. Incrementa CI
-          faseEl.innerText = "2. Incrementa CI (CI = CI + 1)";
-          ci++;
-          atualizarUI('ci', ci); destacar('reg-ci');
-          estado = 2;
-          break;
-
-        case 2: // 3. Decodifica a Instrução
-          faseEl.innerText = "3. Decodifica (UC analisa RI)";
-          destacar('uc-group'); destacar('reg-ri');
-          estado = 3;
-          break;
-
-        case 3: // 4. Busca Operandos
-          let partesBusca = ri.split(" ");
-          if (partesBusca.length > 1 && partesBusca[0] !== "STORE") {
-            faseEl.innerText = "4. Busca Operandos (REM <- Endereço, RDM <- Dado)";
-            rem = parseInt(partesBusca[1]); atualizarUI('rem', rem); destacar('reg-rem');
-            rdm = dados[rem]; atualizarUI('rdm', rdm); destacar('reg-rdm');
-            destacar('dado-' + rem);
-          } else {
-            faseEl.innerText = "4. Busca Operandos (Não necessário / STORE)";
-          }
-          estado = 4;
-          break;
-
-        case 4: // 5. Executa
-          faseEl.innerText = "5. Executa (ULA opera)";
-          let partesEx = ri.split(" ");
-          let inst = partesEx[0]; let end = parseInt(partesEx[1]);
-          
-          if (inst === "LOAD") { acc = rdm; }
-          else if (inst === "ADD") { acc += rdm; }
-          else if (inst === "STORE") {
-            dados[end] = acc;
-            rdm = acc; atualizarUI('rdm', rdm);
-            rem = end; atualizarUI('rem', rem);
-            atualizarUI('val-' + end, acc);
-            destacar('dado-' + end); destacar('reg-rdm'); destacar('reg-rem');
-          }
-          
-          atualizarUI('acc', acc); destacar('reg-acc'); destacar('ula-group');
-          estado = 0;
-          ciclos++;
-          break;
-      }
-    }
-  </script>
+function reiniciar(){
+  clearInterval(timer);timer=null;$("auto").textContent="Automático";
+  mem=[...INIT];ci=0;ri=0;rem=0;rdm=0;acc=0;dec="—";ula="—";curOp=-1;cycle=1;n=0;done=false;bus=null;
+  gen=ciclo();reached=new Set();
+  $("banner").textContent="Clique em Avançar para iniciar o primeiro ciclo.";$("banner").style.background="#475569";
+  draw([],null);
+}
+function* ciclo(){
+  const P=(txt,fl,ids,run,bus)=>({txt,fl,ids,run,bus}),m=a=>"m"+a;
+  yield P("Copia o conteúdo do CI para o REM","busca",["r-ci","r-rem"],()=>rem=ci);
+  yield P("O endereço da instrução trafega pelo barramento de endereços","busca",["r-rem"],0,["A",b(rem,6)]);
+  yield P("A célula de memória é endereçada","busca",[m(rem)]);
+  yield P("O conteúdo da célula trafega pelo barramento de dados","busca",[m(rem)],0,["D",b(mem[rem])]);
+  yield P("O conteúdo chega ao RDM","busca",["r-rdm"],()=>rdm=mem[rem]);
+  yield P("A UC copia o RDM para o RI","busca",["r-rdm","r-ri","uc"],()=>ri=rdm);
+  yield P("CI ← CI + 1","inc",["r-ci"],()=>ci++);
+  const op=ri>>6,ad=ri&63;
+  yield P("O decodificador identifica o código da operação: "+b(op,2)+" = "+OPS[op],"dec",["dec","r-ri"],()=>{dec=OPS[op];curOp=op});
+  yield P("A UC verifica se tem operando: Sim","tem",["uc","r-ri"]);
+  yield P("Copia o endereço do operando (RI) no REM","op",["r-ri","r-rem"],()=>rem=ad);
+  yield P("O endereço do operando trafega pelo barramento de endereços","op",["r-rem"],0,["A",b(ad,6)]);
+  yield P("A célula do operando é endereçada","op",[m(ad)]);
+  if(op<3){
+    yield P("O operando trafega pelo barramento de dados","op",[m(ad)],0,["D",b(mem[ad])]);
+    yield P("O operando chega ao RDM","op",["r-rdm"],()=>rdm=mem[ad]);
+  }
+  yield P("A UC verifica se tem mais operandos: Não","tem",["uc"]);
+  if(op<2){
+    const s=op?" − ":" + ",v=op?(acc-rdm)&255:(acc+rdm)&255;
+    yield P("Executa a instrução "+b(op,2)+" ("+OPS[op]+"): a ULA calcula","exe",["ula","r-acc","r-rdm"],()=>ula=b(acc)+s+b(rdm)+" = "+b(v));
+    yield P("A UC armazena o resultado no ACC","exe",["r-acc"],()=>acc=v);
+  }else if(op==2){
+    yield P("Executa LDA: o operando passa pela ULA","exe",["ula","r-rdm"],()=>ula="passa "+b(rdm));
+    yield P("A UC armazena o operando no ACC","exe",["r-acc"],()=>acc=rdm);
+  }else{
+    yield P("Executa STR: a UC copia o ACC para o RDM","exe",["r-acc","r-rdm"],()=>rdm=acc);
+    yield P("O dado trafega pelo barramento de dados","exe",["r-rdm"],0,["D",b(rdm)]);
+    yield P("A célula endereçada recebe o dado","exe",[m(ad)],()=>mem[ad]=rdm);
+  }
+  yield P("Fim do ciclo: a UC volta ao início para buscar a próxima instrução","fim",[]);
+}
+function avancar(){
+  if(done)return;
+  let r=gen.next();
+  if(r.done){
+    if(ci>=NINST){done=true;clearInterval(timer);timer=null;$("auto").textContent="Automático";
+      $("banner").textContent="Programa concluído: ACC = "+acc+" e a posição 9 da memória guarda "+mem[9]+".";return}
+    cycle++;dec="—";ula="—";curOp=-1;reached=new Set();gen=ciclo();r=gen.next();
+  }
+  const p=r.value;n++;
+  if(p.run)p.run();
+  reached.add(p.fl);bus=p.bus;
+  draw(p.ids,p);
+}
+function draw(ids,p){
+  document.querySelectorAll(".hl").forEach(e=>e.classList.remove("hl"));
+  $("ci").textContent=b(ci,6);$("ri").textContent=b(ri>>6,2)+" "+b(ri&63,6);
+  $("rem").textContent=b(rem,6);$("rdm").textContent=b(rdm);$("acc").textContent=b(acc);
+  $("dect").textContent=dec;$("ulat").textContent=ula;$("cic").textContent="Ciclo "+cycle;
+  $("bAv").textContent=bus&&bus[0]=="A"?bus[1]:"—";$("bDv").textContent=bus&&bus[0]=="D"?bus[1]:"—";
+  $("mem").innerHTML=mem.map((v,i)=>`<div class="x" id="m${i}"><b>${i}</b><span>${i<4?b(v>>6,2)+" "+b(v&63,6)+" "+OPS[v>>6]+" "+(v&63):b(v)}</span></div>`).join("");
+  $("tb").innerHTML=OPS.map((o,i)=>`<tr id="t${i}"${i==curOp?' class="hl"':""}><td>${b(i,2)}</td><td>${o}</td><td>${DESC[i]}</td></tr>`).join("");
+  ids.forEach(i=>$(i).classList.add("hl"));
+  if(bus){$(bus[0]=="A"?"bA":"bD").classList.add("hl")}
+  FL.forEach(f=>{const e=$("f-"+f);e.classList.toggle("on",reached.has(f));e.classList.toggle("cur",!!p&&f==p.fl)});
+  if(p){$("banner").textContent=p.txt;$("banner").style.background="hsl("+(n*53%360)+" 60% 34%)"}
+}
+function auto(){
+  if(timer){clearInterval(timer);timer=null;$("auto").textContent="Automático";return}
+  if(done)return;$("auto").textContent="Pausar";timer=setInterval(avancar,1000);
+}
+reiniciar();
+</script>
 </body>
 </html>
